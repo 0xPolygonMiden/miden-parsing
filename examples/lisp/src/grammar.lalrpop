@@ -1,0 +1,119 @@
+use std::sync::Arc;
+
+use miden_diagnostics::{CodeMap, DiagnosticsHandler, SourceIndex, Span};
+
+use crate::ast::*;
+use crate::lexer::Token;
+use crate::parser::ParseError;
+use crate::symbols::Symbol;
+
+grammar(diagnostics: &DiagnosticsHandler, codemap: &Arc<CodeMap>);
+
+pub Script: Script = {
+    <l:@L> <forms:Form+> <r:@R> => Script { span: span!(l, r), forms }
+}
+
+Form: Form = {
+    <l:@L> "(" "module" <name:Ident> <functions:Function+> ")" <r:@R> => {
+        let mut functions = functions;
+        for function in functions.iter_mut() {
+            function.name.module = Some(name);
+        }
+        Form::Module(Module::new(span!(l, r), name, functions))
+    },
+    <Expr> => Form::Expr(<>),
+}
+
+Function: Function = {
+    <l:@L> "(" "def" <name:Ident> "(" <params:Ident*> ")" <body:Expr> ")" <r:@R> => {
+        Function { span: span!(l, r), name: name.into(), params, body: Box::new(body) }
+    },
+}
+
+pub Expr: Expr = {
+    <l:@L> "(" "let" "[" <bindings:LetBinding+> "]" <body:Expr> ")" <r:@R> => {
+        Expr::Let(Let { span: span!(l, r), bindings, body: Box::new(body) })
+    },
+    <l:@L> "(" "lambda" "(" <params:Ident*> ")" <body:Expr> ")" <r:@R> => {
+        Expr::Lambda(Lambda { span: span!(l, r), params, body: Box::new(body) })
+    },
+    <l:@L> "(" <callee:Callee> <args:Expr*> ")" <r:@R> => {
+        Expr::Apply(Apply { span: span!(l, r), callee: Box::new(callee), args })
+    },
+    <l:@L> "(" <op:Operator> <args:Expr+> ")" <r:@R> => {
+        Expr::Op(Op { span: span!(l, r), op, args })
+    },
+    <l:@L> "(" <hd:Expr> "." <tl:Expr>  ")" <r:@R> => {
+        Expr::Cons(Cons { span: span!(l, r), hd: Box::new(hd), tl: Box::new(tl) })
+    },
+    <Literal> => Expr::Lit(<>),
+    <Symbol> => Expr::Symbol(<>),
+    <Ident> => Expr::Var(<>),
+}
+
+LetBinding: Binding = {
+    <l:@L> <name:Ident> <value:Expr> <r:@R> => Binding { span: span!(l, r), name, value },
+}
+
+Operator: Operator = {
+    "+" => Operator::Add,
+    "-" => Operator::Sub,
+    "*" => Operator::Mul,
+    "/" => Operator::Div,
+    "hd" => Operator::Hd,
+    "tl" => Operator::Tl,
+    "if" => Operator::If,
+}
+
+Literal: Lit = {
+    <l:@L> <i:int> <r:@R> => Lit::Int(Span::new(span!(l, r), i)),
+}
+
+Callee: Expr = {
+    Remote,
+    <Ident> => Expr::Var(<>),
+}
+
+Remote: Expr = {
+    <l:@L> <module:Ident> ":" <name:Ident> <r:@R> => Expr::Remote(Remote { span: span!(l, r), module, name }),
+}
+
+Symbol: Ident = {
+    <l:@L> "'" <id:ident> <r:@R> => Ident::new(span!(l, r), id)
+}
+
+Ident: Ident = {
+    <l:@L> <id:ident> <r:@R> => Ident::new(span!(l, r), id)
+}
+
+
+// LEXER
+// ================================================================================================
+
+extern {
+    type Error = ParseError;
+    type Location = SourceIndex;
+
+    enum Token {
+        ident => Token::Ident(<Symbol>),
+        int => Token::Int(<i64>),
+        "lambda" => Token::Lambda,
+        "let" => Token::Let,
+        "module" => Token::Module,
+        "def" => Token::Def,
+        "hd" => Token::Hd,
+        "tl" => Token::Tl,
+        "if" => Token::If,
+        "'" => Token::Quote,
+        "+" => Token::Plus,
+        "-" => Token::Minus,
+        "*" => Token::Star,
+        "/" => Token::Slash,
+        "." => Token::Dot,
+        ":" => Token::Colon,
+        "[" => Token::LBracket,
+        "]" => Token::RBracket,
+        "(" => Token::LParen,
+        ")" => Token::RParen,
+    }
+}

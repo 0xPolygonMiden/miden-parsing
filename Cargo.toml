@@ -1,0 +1,18 @@
+[package]
+name = "miden-parsing"
+description = "Reusable parsing components for use in Miden projects"
+version = "0.1.0"
+authors = ["Miden Developers"]
+repository = "https://github.com/0xPolygonMiden/miden-parsing"
+categories = ["Compilers"]
+keywords = ["miden"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
+thiserror = "1.0"
+
+[dev-dependencies]
+pretty_assertions = "1.0"

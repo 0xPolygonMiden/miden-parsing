@@ -1,0 +1,14 @@
+[package]
+name = "example-lisp"
+version = "0.1.0"
+authors = []
+
+[dependencies]
+miden-parsing = { path = "../../" }
+miden-diagnostics = { git = "https://github.com/0xPolygonMiden/miden-diagnostics" }
+lalrpop-util = "0.19"
+thiserror = "1.0"
+
+[build-dependencies]
+lalrpop = "0.19"
+
