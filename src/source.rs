@@ -7,15 +7,21 @@ use miden_diagnostics::*;
 
 pub type SourceResult<T> = std::result::Result<T, SourceError>;
 
+/// [Source] is an abstraction for files which are read via [Scanner]
 pub trait Source: Sized {
+    /// Create a new implementation of this source from the given [SourceFile]
     fn new(src: Arc<SourceFile>) -> Self;
 
+    /// Read the next character from the source
     fn read(&mut self) -> Option<(SourceIndex, char)>;
 
+    /// Peek the next character from the source
     fn peek(&mut self) -> Option<(SourceIndex, char)>;
 
+    /// Get a [SourceSpan] corresponding to the entire source file
     fn span(&self) -> SourceSpan;
 
+    /// Get a string slice of the underlying source content from the given range
     fn slice(&self, span: impl Into<Range<usize>>) -> &str;
 }
 
@@ -43,7 +49,7 @@ impl ToDiagnostic for SourceError {
     }
 }
 
-/// A source which reads from a `diagnostics::SourceFile`
+/// An implementation of [Source] which reads from a [SourceFile]
 pub struct FileMapSource {
     src: Arc<SourceFile>,
     bytes: *const [u8],
@@ -107,7 +113,7 @@ impl FileMapSource {
         // NOTE: Performance is sensitive to the exact formulation here
         let init = Self::utf8_first_byte(x, 2);
 
-        pos = pos + 1;
+        pos += 1;
         let y = if pos == end {
             0u8
         } else {
@@ -117,7 +123,7 @@ impl FileMapSource {
         if x >= 0xE0 {
             // [[x y z] w] case
             // 5th bit in 0xE0 .. 0xEF is always clear, so `init` is still valid
-            pos = pos + 1;
+            pos += 1;
             let z = if pos == end {
                 0u8
             } else {
@@ -128,7 +134,7 @@ impl FileMapSource {
             if x >= 0xF0 {
                 // [x y z w] case
                 // use only the lower 3 bits of `init`
-                pos = pos + 1;
+                pos += 1;
                 let w = if pos == end {
                     0u8
                 } else {
@@ -138,13 +144,13 @@ impl FileMapSource {
             }
         }
 
-        pos = pos + 1;
+        pos += 1;
         if pos >= end {
             self.eof = true
         }
         self.pos = pos;
 
-        Some((start, char::from_u32_unchecked(ch as u32)))
+        Some((start, char::from_u32_unchecked(ch)))
     }
 
     /// Returns the initial codepoint accumulator for the first byte.
